@@ -199,6 +199,21 @@ func (game *Game) dealerSoftness() int {
 	return dealer
 }
 
+
+func (game *Game) playerSoftness() int {
+	dealer := game.playerScore()
+	for i, card := range game.playerCards{
+		if (dealer > 21) && (card.cardValue() == 11) {
+			game.playerCards[i].value = 14
+			return dealer
+		}
+	}
+	dealer = game.playerScore()
+
+	return dealer
+}
+
+
 func (game *Game) move() {
 	if game.deck.deckLenght() < 1 {
 		game.deck.createDeck()
