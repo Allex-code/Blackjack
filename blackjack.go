@@ -106,6 +106,7 @@ type Game struct {
 	dealer2ndCard Card
 	balance       float64
 	bet           float64
+	splitGames    []Game
 }
 
 // Game begins
@@ -186,33 +187,25 @@ func (game *Game) nextMove() Move {
 	return Move(choice)
 }
 
-func (game *Game) dealerSoftness() int {
+func (game *Game) dealerSoftness() {
 	dealer := game.dealerScore()
 	for i, card := range game.dealerCards {
 		if (dealer > 21) && (card.cardValue() == 11) {
 			game.dealerCards[i].value = 14
-			return dealer
+			return
 		}
 	}
-	dealer = game.dealerScore()
-
-	return dealer
 }
 
-
-func (game *Game) playerSoftness() int {
-	dealer := game.playerScore()
-	for i, card := range game.playerCards{
-		if (dealer > 21) && (card.cardValue() == 11) {
+func (game *Game) playerSoftness() {
+	player := game.playerScore()
+	for i, card := range game.playerCards {
+		if (player > 21) && (card.cardValue() == 11) {
 			game.playerCards[i].value = 14
-			return dealer
+			return
 		}
 	}
-	dealer = game.playerScore()
-
-	return dealer
 }
-
 
 func (game *Game) move() {
 	if game.deck.deckLenght() < 1 {
@@ -221,26 +214,12 @@ func (game *Game) move() {
 	}
 
 	player := game.playerScore()
-	dealer := game.dealerScore()
-	bet := game.bet
 
 	if len(game.playerCards) == 2 {
 		if player == 21 {
-			game.dealerAppend()
-			dealer = game.dealerScore()
-			if dealer != 21 {
-				bet = bet * 1.5
-				game.balance += bet
-				game.gameState()
-				fmt.Println("BlackJack !!!!\t", bet, "$")
-			} else if dealer == 21 {
-				game.gameState()
-				fmt.Println("Push !!!!")
-			}
 			return
 		} else if player == 22 {
 			game.playerCards[0].value = 14
-			game.gameState()
 			player = game.playerScore()
 		}
 	}
@@ -252,128 +231,58 @@ func (game *Game) move() {
 		fmt.Println("\nHit !")
 		game.dealPlayer()
 		player = game.playerScore()
-		if player == 21 {
-			game.dealerAppend()
-			dealer = game.dealerScore()
-			game.gameState()
-			for dealer <= 16 {
-				game.dealDealer()
-				game.dealerSoftness()
-				dealer = game.dealerScore()
-			}
-			if (dealer < 21) || (dealer > 21) {
-				game.gameState()
-				game.balance += bet
-				fmt.Println("\nWon !")
-			} else if dealer == 21 {
-				game.gameState()
-				fmt.Println("\nPush !")
-			}
-			return
-		} else if player < 21 {
+		if player < 21 {
 			game.gameState()
 			game.move()
 			return
-		} else if player > 21 {
-			for i, card := range game.playerCards {
-				if card.cardValue() == 11 {
-					game.playerCards[i].value = 14
-				}
-				if game.playerScore() < 21 {
-					game.gameState()
-					game.move()
-					return
-				}
-			}
-			if len(game.dealerCards) == 1 {
-				// game.dealerAppend()
-				game.gameState()
-				game.balance -= bet
-				fmt.Println("\nBust !")
-				return
-			}
+		} else if player >= 21 {
+			game.playerSoftness()
+			return
 		}
+
 	case 2:
 		fmt.Println("\nStand !")
-		game.dealerAppend()
-		game.dealerSoftness()
-		player = game.playerScore()
-		dealer = game.dealerScore()
-		game.gameState()
-
-		for dealer <= 16 {
-			game.dealDealer()
-			game.dealerSoftness()
-			dealer = game.dealerScore()
-		}
-		if (player > dealer) || (dealer > 21) {
-			game.gameState()
-			game.balance += bet
-			fmt.Println("Won !")
-			return
-		} else if dealer > player {
-			game.gameState()
-			game.balance -= bet
-			fmt.Println("Bust !")
-			return
-		} else {
-			game.gameState()
-			fmt.Println("Push")
-			return
-		}
+		return
 	}
 	if len(game.playerCards) == 2 {
 		switch choice {
 		case 3:
 			fmt.Println("\nDouble Down !")
-			bet = 2 * bet
+			game.bet = 2 * game.bet
 			game.dealPlayer()
-			player = game.playerScore()
-			if player > 21 {
-				for i, card := range game.playerCards {
-					if card.cardValue() == 11 {
-						game.playerCards[i].value = 14
-						player = game.playerScore()
-						break
-					}
-				}
-			}
-
-			game.dealerAppend()
-			game.dealerSoftness()
-			game.gameState()
-			dealer := game.dealerScore()
-
-			if player <= 21 {
-				for dealer <= 16 {
-					game.dealDealer()
-					game.dealerSoftness()
-					game.gameState()
-					dealer = game.dealerScore()
-				}
-				if (dealer < player) || (dealer > 21) {
-					game.balance += bet
-					fmt.Println("\nWon !!!a")
-				} else if dealer == player {
-					fmt.Println("\nPush !!!a")
-				} else if dealer > player  {
-					game.balance -= bet
-					fmt.Println("\nBust !!!a")
-				}
-				return
-			} else if (player > 21) {
-				game.balance -= bet
-				fmt.Println("Bust !")
-			}
 		}
 	}
 	if true {
 		switch choice {
 		case 4:
-			fmt.Println("Split !")	
-			
+			fmt.Println("Split !")
+			if len(game.playerCards) == 2 {
+				for i := range 2 {
+					splitGame := &Game{}
+					game.splitGames = append(game.splitGames, *splitGame)
+					game.splitGames[i].playerCards = append(
+						splitGame.playerCards,
+						game.playerCards[i],
+					)
+				}
+			}
+
+			fmt.Println("Checkpoint !")
+			for _, splitgame := range game.splitGames {
+				splitgame.bet = game.bet
+				fmt.Printf("Bet:\t\t %.2f $\n", splitgame.bet)
+				splitgame.deck = game.deck
+				splitgame.move()
+				game.deck = splitgame.deck
+			}
 		}
 	}
+}
+
+func (game *Game) splitGame() {
+}
+
+func (game *Game) evaluate() {
 }
 
 func (game *Game) playerScore() int {
@@ -491,6 +400,8 @@ func (game *Game) newGame() {
 		newGame.deck = game.deck
 	}
 	newGame.deck = game.deck
+	newGame.deck.Cards[51].value = 5
+	newGame.deck.Cards[49].value = 5
 	newGame.deal()
 
 	newGame.move()
