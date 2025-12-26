@@ -106,6 +106,7 @@ type Game struct {
 	dealer2ndCard Card
 	balance       float64
 	bet           float64
+	splitedGame   bool
 	splitGames    []Game
 }
 
@@ -148,7 +149,6 @@ const (
 func (game *Game) nextMove() Move {
 	doubleDown, split := false, false
 
-	game.gameState()
 	if len(game.playerCards) != 2 {
 		fmt.Println("HIT	STAND")
 	} else if (len(game.playerCards) == 2) && (game.playerCards[0].value == game.playerCards[1].value) {
@@ -215,7 +215,7 @@ func (game *Game) move() {
 
 	player := game.playerScore()
 
-	if len(game.playerCards) == 2 {
+	if len(game.playerCards) == 2 && !game.splitedGame {
 		if player == 21 {
 			return
 		} else if player == 22 {
@@ -230,17 +230,23 @@ func (game *Game) move() {
 	case 1:
 		fmt.Println("\nHit !")
 		game.dealPlayer()
+		game.playerSoftness()
 		player = game.playerScore()
 		if player < 21 {
-			game.gameState()
+			game.prettyPrintPlayerHand()
+			game.prettyPrintDealerHand()
 			game.move()
 			return
 		} else if player >= 21 {
+			game.prettyPrintPlayerHand()
+			game.prettyPrintDealerHand()
 			game.playerSoftness()
 			return
 		}
 
 	case 2:
+		game.prettyPrintPlayerHand()
+		game.prettyPrintDealerHand()
 		fmt.Println("\nStand !")
 		return
 	}
@@ -250,12 +256,15 @@ func (game *Game) move() {
 			fmt.Println("\nDouble Down !")
 			game.bet = 2 * game.bet
 			game.dealPlayer()
+			game.playerSoftness()
+			game.prettyPrintPlayerHand()
+			game.prettyPrintDealerHand()
 		}
 	}
 	if true {
 		switch choice {
 		case 4:
-			fmt.Println("Split !")
+			game.splitedGame = true
 			if len(game.playerCards) == 2 {
 				for i := range 2 {
 					splitGame := &Game{}
@@ -267,19 +276,33 @@ func (game *Game) move() {
 				}
 			}
 
-			fmt.Println("Checkpoint !")
-			for _, splitgame := range game.splitGames {
-				splitgame.bet = game.bet
-				fmt.Printf("Bet:\t\t %.2f $\n", splitgame.bet)
+			for i, splitgame := range game.splitGames {
+				if game.deck.deckLenght() < 1 {
+					game.deck.createDeck()
+					game.deck.shuffle()
+				}
 				splitgame.deck = game.deck
+
+				if len(splitgame.playerCards) == 1 {
+					splitgame.dealPlayer()
+					splitgame.bet = game.bet
+					splitgame.dealerCards = append(splitgame.dealerCards, game.dealerCards[0])
+					splitgame.dealer2ndCard = game.dealer2ndCard
+				}
+				fmt.Println("\n\nGame ", i+1)
+				fmt.Printf("Bet:\t\t %.2f $\n", splitgame.bet)
+				splitgame.prettyPrintPlayerHand()
+				splitgame.prettyPrintDealerHand()
 				splitgame.move()
 				game.deck = splitgame.deck
+				fmt.Println(splitgame.playerScore())
+
+				splitgame.evaluate()
 			}
+			return
 		}
 	}
-}
-
-func (game *Game) splitGame() {
+	game.evaluate()
 }
 
 func (game *Game) evaluate() {
@@ -317,15 +340,19 @@ func (game *Game) printPlayerHand(b bool) []string {
 	return printedHand
 }
 
-func (game *Game) prettyPrintHands() {
+func (game *Game) prettyPrintPlayerHand() {
 	fmt.Printf("\nPlayer:\t\t %s\n", strings.Join(game.printPlayerHand(true), " "))
+}
+
+func (game *Game) prettyPrintDealerHand() {
 	fmt.Printf("Dealer:\t\t %s\n", strings.Join(game.printPlayerHand(false), " "))
 }
 
 func (game *Game) gameState() {
 	playerSum := game.playerScore()
 	dealerSum := game.dealerScore()
-	game.prettyPrintHands()
+	game.prettyPrintPlayerHand()
+	game.prettyPrintDealerHand()
 	fmt.Printf("Player score:\t %d\n", playerSum)
 	fmt.Printf("Dealer score:\t %d\n", dealerSum)
 	fmt.Println("Deck: ", game.deck.deckLenght())
@@ -389,6 +416,7 @@ func playAgain() bool {
 
 func (game *Game) newGame() {
 	newGame := &Game{}
+	game.splitedGame = false
 	newGame.balance = game.balance
 	//	newGame.bet = newGame.enterBet()
 	newGame.bet = 200
@@ -404,6 +432,8 @@ func (game *Game) newGame() {
 	newGame.deck.Cards[49].value = 5
 	newGame.deal()
 
+	newGame.prettyPrintPlayerHand()
+	newGame.prettyPrintDealerHand()
 	newGame.move()
 	game.balance = newGame.balance
 	game.deck = newGame.deck
